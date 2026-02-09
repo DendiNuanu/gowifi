@@ -1,0 +1,15 @@
+[Unit]
+Description=Nuanu WiFi Backend (Go)
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/nextjsgowifinuanudynamic/backend
+ExecStart=/var/www/nextjsgowifinuanudynamic/backend/server
+Restart=always
+RestartSec=5
+EnvironmentFile=/var/www/nextjsgowifinuanudynamic/.env
+
+[Install]
+WantedBy=multi-user.target

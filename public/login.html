@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiFi Portal - Connecting...</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #ffffff;
+            color: #1a1a1a;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 400px;
+            padding: 40px;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 24px;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #f3f4f6;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 24px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        h1 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #111827;
+            margin: 0 0 8px;
+        }
+
+        p {
+            font-size: 14px;
+            color: #6b7280;
+            margin: 0;
+        }
+
+        .brand {
+            margin-top: 40px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #9ca3af;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="spinner"></div>
+        <h1>Nuanu WiFi</h1>
+        <p>Connecting to secure network...</p>
+        <div class="brand">NUANU • BALI</div>
+    </div>
+
+    <!-- MikroTik Hidden Variables -->
+    <div style="display:none">
+        <form name="sendin" action="$(link-login-only)" method="post">
+            <input type="hidden" name="username" value="$(username)">
+            <input type="hidden" name="password" value="$(password)">
+            <input type="hidden" name="dst" value="$(link-orig)">
+            <input type="hidden" name="popup" value="true">
+        </form>
+    </div>
+
+    <script>
+        // Use the production portal URL
+        const PORTAL_URL = "https://gowifi.nuanu.io/login";
+
+        // Collect ALL possible MikroTik variables
+        const mtParams = {
+            'mac': '$(mac)',
+            'ip': '$(ip)',
+            'username': '$(username)',
+            'link-login': '$(link-login)',
+            'link-orig': '$(link-orig)',
+            'error': '$(error)',
+            'chap-id': '$(chap-id)',
+            'chap-challenge': '$(chap-challenge)',
+            'link-login-only': '$(link-login-only)',
+            'link-orig-esc': '$(link-orig-esc)',
+            'm_gateway_ip': '192.168.1.1' // Fallback helper
+        };
+
+        const params = new URLSearchParams(window.location.search);
+
+        // Append MikroTik variables to existing query string
+        for (const [key, value] of Object.entries(mtParams)) {
+            // Only set if variable was expanded by MikroTik (doesn't start with '$(')
+            if (value && !value.startsWith('$(')) {
+                params.set(key, value);
+            }
+        }
+
+        // Final redirect to the landing page portal
+        window.location.replace(PORTAL_URL + "?" + params.toString());
+    </script>
+</body>
+
+</html>
