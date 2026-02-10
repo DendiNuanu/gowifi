@@ -17,6 +17,13 @@ export interface PageSettings {
     facebook_app_secret: string
 }
 
+export interface CollectedEmail {
+    id: number
+    email: string
+    source: string
+    created_at: string
+}
+
 export interface ScheduledAd {
     id?: number
     title: string
@@ -128,5 +135,20 @@ export async function getActiveAd(): Promise<{ ad: ScheduledAd | null }> {
         return res.json()
     } catch (err) {
         return { ad: null }
+    }
+}
+
+export async function getEmails(): Promise<CollectedEmail[]> {
+    try {
+        const res = await fetch(`${API_URL}/api/emails`, {
+            cache: 'no-store',
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.json()
+    } catch (error) {
+        console.error('❌ Error fetching emails:', error)
+        return []
     }
 }

@@ -1,0 +1,6 @@
+DELETE FROM collected_emails
+WHERE email IN (
+  'bliwahyu1234@gmail.com',
+  'visualdendy@gmail.com',
+  'abe@abe.com'
+);

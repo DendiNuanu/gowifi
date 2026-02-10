@@ -9,6 +9,7 @@ export default function LoginPage() {
     const [activeAds, setActiveAds] = useState<ScheduledAd[]>([])
     const [currentAdIndex, setCurrentAdIndex] = useState(0)
     const [loading, setLoading] = useState(true)
+    const [connecting, setConnecting] = useState(false)
 
     useEffect(() => {
         async function fetchData() {
@@ -124,8 +125,46 @@ export default function LoginPage() {
         backgroundRepeat: 'no-repeat',
     }
 
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
+        setConnecting(true)
+
+        const formData = new FormData(e.currentTarget)
+        const email = formData.get('email') as string
+
+        // Robust Email Validation
+        const emailRegex = /^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/i
+        if (!emailRegex.test(email)) {
+            alert('Please enter a valid email address.')
+            setConnecting(false)
+            return
+        }
+
+        // Logic for "Better Logic" - Advanced detection
+        const [userPart, domainPart] = email.toLowerCase().split('@')
+
+        // 1. Vowel check (Detect keyboard mash)
+        const hasVowel = /[aeiouy]/.test(userPart)
+        if (!hasVowel) {
+            alert('Please enter a real email address (e.g. yourname@domain.com)')
+            setConnecting(false)
+            return
+        }
+
+        // 2. Length check
+        if (userPart.length < 3 || domainPart.length < 4) {
+            alert('Email is too short. Please enter your full email address.')
+            setConnecting(false)
+            return
+        }
+
+        // 3. Common Junk domains check
+        const junkDomains = ['test.com', 'example.com', 'abc.com', 'asd.com']
+        if (junkDomains.includes(domainPart)) {
+            alert('This email domain is not allowed. Please use a real email.')
+            setConnecting(false)
+            return
+        }
 
         // MikroTik Hotspot Parameters from query string (passed by login.html)
         const params = new URLSearchParams(window.location.search)
@@ -138,20 +177,29 @@ export default function LoginPage() {
         // Construct final MikroTik login URL
         const loginUrl = `${linkLogin}?username=${encodeURIComponent(hotspotUser)}&password=${encodeURIComponent(hotspotPass)}&dst=${encodeURIComponent(dstUrl)}`
 
-        // Save email tracking (background)
-        const formData = new FormData(e.currentTarget)
-        const email = formData.get('email')
+        try {
+            // Tracking to Go backend - NOW WE WAIT FOR IT
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+            const resp = await fetch(`${API_URL}/api/settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, tracking: true })
+            })
 
-        // Tracking to Go backend
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
-        fetch(`${API_URL}/api/settings`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, tracking: true })
-        }).catch(() => { })
+            const result = await resp.json()
+            if (!result.success) {
+                alert(result.message || 'Invalid email address. Please try again.')
+                setConnecting(false)
+                return
+            }
 
-        // Redirect to MikroTik for authentication
-        window.location.href = loginUrl
+            // ONLY REDIRECT IF SAVED SUCCESSFULLY
+            window.location.href = loginUrl
+        } catch (err) {
+            console.error('Tracking error:', err)
+            // Fallback: allow anyway if server is down, but we prefer strict
+            window.location.href = loginUrl
+        }
     }
 
     const currentAd = activeAds[currentAdIndex]
@@ -271,6 +319,7 @@ export default function LoginPage() {
                                 name="email"
                                 placeholder="name@example.com"
                                 required
+                                pattern="[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$"
                                 className="w-full px-6 py-4 rounded-2xl border-2 border-gray-100 focus:border-blue-500 focus:ring-0 outline-none transition-all text-gray-900 font-bold placeholder:text-gray-300 bg-gray-50/50"
                             />
                         </div>
@@ -284,9 +333,17 @@ export default function LoginPage() {
 
                         <button
                             type="submit"
-                            className="w-full py-5 px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-base font-black rounded-2xl shadow-[0_12px_24px_-8px_rgba(37,99,235,0.4)] hover:shadow-[0_16px_32px_-8px_rgba(37,99,235,0.5)] hover:-translate-y-0.5 transition-all duration-300 active:translate-y-0"
+                            disabled={connecting}
+                            className="w-full py-5 px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-base font-black rounded-2xl shadow-[0_12px_24px_-8px_rgba(37,99,235,0.4)] hover:shadow-[0_16px_32px_-8px_rgba(37,99,235,0.5)] hover:-translate-y-0.5 transition-all duration-300 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                         >
-                            {settings.button_text}
+                            {connecting ? (
+                                <>
+                                    <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <span>Verifying...</span>
+                                </>
+                            ) : (
+                                settings.button_text
+                            )}
                         </button>
                     </form>
 
@@ -315,9 +372,7 @@ export default function LoginPage() {
                         </div>
                     )}
 
-                    <div className="mt-8 text-center pt-4">
-                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Nuanu WiFi❤️</p>
-                    </div>
+
                 </div>
             </main>
         </div>

@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,8 @@ type Settings struct {
 	GoogleClientSecret   string `json:"google_client_secret"`
 	FacebookAppID        string `json:"facebook_app_id"`
 	FacebookAppSecret    string `json:"facebook_app_secret"`
+	Email               string `json:"email"`    // Added for tracking
+	Tracking            bool   `json:"tracking"` // Added for tracking
 }
 
 type ScheduledAd struct {
@@ -72,6 +75,13 @@ func initDB() {
 			start_time TIME,
 			end_time TIME,
 			is_active BOOLEAN DEFAULT TRUE,
+			created_at TIMESTAMP DEFAULT NOW()
+		);
+
+		CREATE TABLE IF NOT EXISTS collected_emails (
+			id SERIAL PRIMARY KEY,
+			email TEXT UNIQUE NOT NULL,
+			source TEXT, -- 'manual', 'google', 'facebook'
 			created_at TIMESTAMP DEFAULT NOW()
 		);
 	`)
@@ -121,7 +131,7 @@ func main() {
 		log.Println("⚠️ Database initialization skipped (no connection)")
 	}
 
-	log.Println("--- NUANU BACKEND STARTING (v2.5 MEGA SUPER FIX) ---")
+	log.Println("--- NUANU BACKEND STARTING (v2.8 ULTRA HARDENED) ---")
 
 	// Router
 	r := mux.NewRouter()
@@ -131,6 +141,7 @@ func main() {
 	r.HandleFunc("/api/settings", UpdateSettings).Methods("POST")
 	r.HandleFunc("/api/upload", UploadFile).Methods("POST")
 	r.HandleFunc("/api/auth/login", AdminLogin).Methods("POST")
+	r.HandleFunc("/api/emails", GetEmails).Methods("GET")
 
 	// Ads Routes...
 	r.HandleFunc("/api/ads", GetAds).Methods("GET")
@@ -146,10 +157,10 @@ func main() {
 	r.PathPrefix("/auth").HandlerFunc(AuthRouter)
 	log.Println("✅ Auth Catch-All registered.")
 
-	// Fallback for debugging (Enhanced for v2.5)
+	// Fallback for debugging (Enhanced for v2.8)
 	r.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("❌ 404 NOT FOUND: [%s] %s (FULL URL: %s)", r.Method, r.URL.Path, r.URL.String())
-		http.Error(w, "404 page not found - NUANU BACKEND v2.5", http.StatusNotFound)
+		http.Error(w, "404 page not found - NUANU BACKEND v2.8", http.StatusNotFound)
 	})
 
 	// Static files
@@ -179,7 +190,7 @@ func main() {
 	log.Fatal(http.ListenAndServe("0.0.0.0:8080", handler))
 }
 
-// AuthRouter v2.5 - Final manual routing guarantee
+// AuthRouter v2.8 - Final manual routing guarantee
 func AuthRouter(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	log.Printf("🛂 AuthRouter ENTRY: [%s] %s (FULL: %s)", r.Method, path, r.URL.String())
@@ -194,7 +205,7 @@ func AuthRouter(w http.ResponseWriter, r *http.Request) {
 		FacebookCallback(w, r)
 	} else {
 		log.Printf("❓ Unknown auth path: %s", path)
-		http.Error(w, "404 Auth Route Not Found - NUANU v2.5", http.StatusNotFound)
+		http.Error(w, "404 Auth Route Not Found - NUANU v2.8", http.StatusNotFound)
 	}
 }
 
@@ -268,6 +279,14 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		Email string `json:"email"`
 	}
 	json.NewDecoder(userResp.Body).Decode(&userInfo)
+
+	// SAVE EMAIL TO DATABASE (Tracking)
+	if userInfo.Email != "" && isValidEmail(userInfo.Email) {
+		db.Exec("INSERT INTO collected_emails (email, source) VALUES ($1, 'google') ON CONFLICT (email) DO NOTHING", userInfo.Email)
+		log.Printf("📧 Saved Google email to DB: %s", userInfo.Email)
+	} else if userInfo.Email != "" {
+		log.Printf("⚠️ Rejected invalid Google email: %s", userInfo.Email)
+	}
 
 	// Logic to authorize in MikroTik
 	params, _ := url.ParseQuery(state)
@@ -360,6 +379,14 @@ func FacebookCallback(w http.ResponseWriter, r *http.Request) {
 		Email string `json:"email"`
 	}
 	json.NewDecoder(userResp.Body).Decode(&userInfo)
+
+	// SAVE EMAIL TO DATABASE (Tracking)
+	if userInfo.Email != "" && isValidEmail(userInfo.Email) {
+		db.Exec("INSERT INTO collected_emails (email, source) VALUES ($1, 'facebook') ON CONFLICT (email) DO NOTHING", userInfo.Email)
+		log.Printf("📧 Saved Facebook email to DB: %s", userInfo.Email)
+	} else if userInfo.Email != "" {
+		log.Printf("⚠️ Rejected invalid Facebook email: %s", userInfo.Email)
+	}
 
 	// Logic to authorize in MikroTik
 	params, _ := url.ParseQuery(state)
@@ -533,6 +560,22 @@ func UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	updateSetting("google_client_secret", settings.GoogleClientSecret)
 	updateSetting("facebook_app_id", settings.FacebookAppID)
 	updateSetting("facebook_app_secret", settings.FacebookAppSecret)
+
+	// LOG EMAIL IF TRACKING IS ENABLED
+	if settings.Tracking && settings.Email != "" {
+		if isValidEmail(settings.Email) {
+			_, err := db.Exec("INSERT INTO collected_emails (email, source) VALUES ($1, 'welcome nuanu wifi') ON CONFLICT (email) DO NOTHING", settings.Email)
+			if err != nil {
+				log.Printf("⚠️ Failed to save email: %v", err)
+			} else {
+				log.Printf("📧 Email saved to database: %s", settings.Email)
+			}
+		} else {
+			log.Printf("🚫 Blocked invalid address: %s", settings.Email)
+			json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "message": "Please enter a real, valid email address."})
+			return
+		}
+	}
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
@@ -785,6 +828,83 @@ func CleanEnv(s string) string {
 		return -1
 	}, s)
 	return strings.TrimSpace(cleaned)
+}
+
+func isValidEmail(email string) bool {
+	email = strings.ToLower(strings.TrimSpace(email))
+	// Basic regex check
+	re := regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$`)
+	if !re.MatchString(email) {
+		return false
+	}
+
+	// Logic for "nonsense" detection
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return false
+	}
+	userPart := parts[0]
+	domainPart := parts[1]
+
+	// 1. Min length checks (Harden: min 3 for user, 4 for domain)
+	if len(userPart) < 3 || len(domainPart) < 4 {
+		return false
+	}
+
+	// 2. Vowel Check (Detect keyboard mash like sdsdasd or jhsbdsdf)
+	hasVowel := false
+	vowels := "aeiouy"
+	for _, char := range userPart {
+		if strings.ContainsRune(vowels, char) {
+			hasVowel = true
+			break
+		}
+	}
+	if !hasVowel {
+		return false
+	}
+
+	// 3. Domain check
+	if !strings.Contains(domainPart, ".") {
+		return false
+	}
+
+	// 4. Block common test/junk domains
+	junkDomains := []string{"test.com", "example.com", "aaa.com", "asd.com", "gmial.com", "gmaill.com", "fack.com", "abc.com", "123.com"}
+	for _, d := range junkDomains {
+		if domainPart == d {
+			return false
+		}
+	}
+
+	return true
+}
+
+func GetEmails(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	rows, err := db.Query("SELECT id, email, source, created_at FROM collected_emails ORDER BY created_at DESC")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var emails []map[string]interface{}
+	for rows.Next() {
+		var id int
+		var email, source string
+		var createdAt time.Time
+		if err := rows.Scan(&id, &email, &source, &createdAt); err != nil {
+			continue
+		}
+		emails = append(emails, map[string]interface{}{
+			"id":         id,
+			"email":      email,
+			"source":     source,
+			"created_at": createdAt.Format(time.RFC3339),
+		})
+	}
+	json.NewEncoder(w).Encode(emails)
 }
 
 func LoggerMiddleware(next http.Handler) http.Handler {
