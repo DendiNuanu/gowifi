@@ -62,7 +62,7 @@ Write-Host " [5/5] Uploading and Restarting..." -ForegroundColor Yellow
 scp $ZIP_NAME "${USER}@${SERVER_IP}:${DEST_PATH}/"
 
 # Fix: Added 'chmod -R 755 .' to ensure Nginx can read all files (fixes 403 Forbidden)
-$remoteCommands = "echo 'Stopping services...'; systemctl stop nuanu-backend nuanu-frontend || true; cd ${DEST_PATH}; echo 'Cleaning old files...'; rm -rf .next public backend/server server.js deploy; echo 'Unzipping...'; unzip -o ${ZIP_NAME} > /dev/null; echo 'Fixing Permissions (Critical)...'; chmod -R 755 .; chown -R root:root .; echo 'Restarting...'; bash deploy/setup.sh"
+$remoteCommands = "echo 'Stopping services...'; systemctl stop nuanu-backend nuanu-frontend || true; cd ${DEST_PATH}; echo 'Cleaning old files...'; rm -rf .next public backend/server server.js deploy; echo 'Unzipping...'; unzip -o ${ZIP_NAME} > /dev/null; echo 'Fixing Permissions...'; chmod -R 755 .; chown -R root:root .; chmod +x backend/server; echo 'Restarting...'; bash deploy/setup.sh; echo 'Backend Version Check:'; journalctl -u nuanu-backend -n 20 --no-pager | grep 'NUANU BACKEND STARTING'"
 
 ssh -o ServerAliveInterval=60 "${USER}@${SERVER_IP}" $remoteCommands
 

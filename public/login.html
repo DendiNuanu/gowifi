@@ -82,7 +82,7 @@
         <form name="sendin" action="$(link-login-only)" method="post">
             <input type="hidden" name="username" value="$(username)">
             <input type="hidden" name="password" value="$(password)">
-            <input type="hidden" name="dst" value="$(link-orig)">
+            <input type="hidden" name="dst" value="https://www.nuanu.com/">
             <input type="hidden" name="popup" value="true">
         </form>
     </div>
@@ -95,9 +95,10 @@
         const mtParams = {
             'mac': '$(mac)',
             'ip': '$(ip)',
-            'username': '$(username)',
+            'username': 'user',
+            'password': 'user',
             'link-login': '$(link-login)',
-            'link-orig': '$(link-orig)',
+            'link-orig': 'https://www.nuanu.com/',
             'error': '$(error)',
             'chap-id': '$(chap-id)',
             'chap-challenge': '$(chap-challenge)',
