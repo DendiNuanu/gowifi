@@ -263,10 +263,6 @@ export default function LoginPage() {
 
                             {/* Ad Title and Description */}
                             <div className="absolute bottom-4 left-6 right-6">
-                                <div className="flex items-center gap-2 mb-1.5 opacity-80">
-                                    <div className="h-1 w-1 rounded-full bg-blue-400 animate-pulse" />
-                                    <p className="text-[10px] text-blue-200 font-bold uppercase tracking-wider">Limited Campaign</p>
-                                </div>
                                 <h2 className="text-xl font-black text-white leading-tight mb-1 drop-shadow-sm">{currentAd.title}</h2>
                                 <p className="text-xs text-gray-200 line-clamp-2 drop-shadow-sm font-medium opacity-90 leading-relaxed">{currentAd.description}</p>
                             </div>
