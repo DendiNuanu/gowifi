@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { getSettings, updateSettings, uploadFile, getAds, createAd, deleteAd, updateAd, getEmails, type PageSettings, type ScheduledAd, type CollectedEmail, API_URL } from '@/lib/api'
-import { Upload, Save, Loader2, Image as ImageIcon, CheckCircle, Trash2, Calendar, Clock, Plus, Monitor, Pencil, X, AlertCircle } from 'lucide-react'
+import { getSettings, updateSettings, uploadFile, getAds, createAd, deleteAd, updateAd, type PageSettings, type ScheduledAd, API_URL } from '@/lib/api'
+import { Upload, Save, Loader2, Image as ImageIcon, CheckCircle, Trash2, Calendar, Clock, Plus, Monitor, Pencil, X, AlertCircle, Mail } from 'lucide-react'
+import Link from 'next/link'
 import ImageCropper from '@/components/ImageCropper'
 
 export default function AdminPage() {
@@ -12,7 +13,6 @@ export default function AdminPage() {
     const [saving, setSaving] = useState(false)
     const [previewImage, setPreviewImage] = useState<string>('')
     const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
-    const [emails, setEmails] = useState<CollectedEmail[]>([])
     const [showNotification, setShowNotification] = useState(false)
     const [currentTime, setCurrentTime] = useState('')
     const [mounted, setMounted] = useState(false)
@@ -43,12 +43,11 @@ export default function AdminPage() {
         async function fetchData() {
             console.log('🔄 AdminPage: Initializing data fetch from:', API_URL)
             try {
-                const [settingsData, adsData, emailsData] = await Promise.all([getSettings(), getAds(), getEmails()])
+                const [settingsData, adsData] = await Promise.all([getSettings(), getAds()])
                 console.log('✅ AdminPage: Data fetched successfully')
 
                 setSettings(settingsData)
                 setAds(adsData)
-                setEmails(emailsData)
 
                 if (settingsData) {
                     let imgUrl = settingsData.background_image || ''
@@ -474,10 +473,20 @@ export default function AdminPage() {
                                 <p className="text-gray-500 font-medium text-sm">Manage your hotspot landing page and advertisements</p>
                             </div>
                         </div>
-                        <div className="bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 flex items-center gap-3">
-                            <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-                            <div className="text-sm font-bold text-blue-700 uppercase tracking-wider whitespace-nowrap">
-                                {mounted ? `${currentTime} WITA` : '--:--'}
+                        <div className="flex items-center gap-3">
+                            <Link
+                                href="/admin/emails"
+                                className="bg-white px-5 py-2.5 rounded-xl border border-blue-100 flex items-center gap-2 text-blue-600 font-bold hover:bg-blue-50 transition-all shadow-sm hover:translate-y-[-1px] active:translate-y-0"
+                            >
+                                <Mail className="w-5 h-5" />
+                                <span>Manage Emails</span>
+                            </Link>
+
+                            <div className="bg-blue-50 px-4 py-2.5 rounded-xl border border-blue-100 flex items-center gap-3">
+                                <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                                <div className="text-sm font-bold text-blue-700 uppercase tracking-wider whitespace-nowrap">
+                                    {mounted ? `${currentTime} WITA` : '--:--'}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -812,75 +821,6 @@ export default function AdminPage() {
                     </div>
                 </div>
 
-                {/* Collected Emails Section */}
-                <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-blue-100/50">
-                    <div className="p-8 border-b border-blue-50 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 flex items-center justify-between">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-900">Collected Emails</h2>
-                            <p className="text-gray-500 font-medium">View and manage user emails collected from the landing page</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={async () => {
-                                    const data = await getEmails();
-                                    setEmails(data);
-                                    notify('Email list refreshed');
-                                }}
-                                className="p-2 bg-white hover:bg-blue-50 text-blue-600 rounded-xl border border-blue-100 shadow-sm transition-all flex items-center gap-2 text-xs font-bold"
-                            >
-                                <Loader2 className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                                Refresh
-                            </button>
-                            <AlertCircle className="w-8 h-8 text-blue-500/30" />
-                        </div>
-                    </div>
-
-                    <div className="p-0 overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-50/50">
-                                    <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Date Collected</th>
-                                    <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Email Address</th>
-                                    <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Source</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {emails.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={3} className="px-8 py-12 text-center text-gray-400 font-medium">
-                                            No emails collected yet.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    emails.map((item) => (
-                                        <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
-                                            <td className="px-8 py-4 text-xs font-bold text-gray-500 border-b border-gray-50">
-                                                {new Date(item.created_at).toLocaleString('en-GB', {
-                                                    day: '2-digit',
-                                                    month: '2-digit',
-                                                    year: 'numeric',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                })}
-                                            </td>
-                                            <td className="px-8 py-4 text-sm font-black text-gray-900 border-b border-gray-50">
-                                                {item.email}
-                                            </td>
-                                            <td className="px-8 py-4 border-b border-gray-50">
-                                                <span className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg border shadow-sm ${item.source === 'google' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                                    item.source === 'facebook' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
-                                                        'bg-gray-50 text-gray-600 border-gray-200'
-                                                    }`}>
-                                                    {item.source}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
         </div>
     )
