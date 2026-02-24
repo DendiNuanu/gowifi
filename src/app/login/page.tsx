@@ -493,7 +493,7 @@ export default function LoginPage() {
                     }}
                     onClick={() => {
                         if (currentAd?.link) {
-                            window.open(currentAd.link, '_blank')
+                            window.location.href = `/ad-landing?url=${encodeURIComponent(currentAd.link)}`
                         }
                     }}
                 >
