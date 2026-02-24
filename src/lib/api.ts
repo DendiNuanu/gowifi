@@ -29,12 +29,14 @@ export interface ScheduledAd {
     title: string
     description: string
     image: string
+    link: string
     start_date: string
     end_date: string
     start_time: string
     end_time: string
     is_active: boolean
 }
+
 
 export async function getSettings(): Promise<PageSettings> {
     try {

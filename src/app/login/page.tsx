@@ -4,12 +4,22 @@ import { useEffect, useState } from 'react'
 import { getSettings, getAds, type PageSettings, type ScheduledAd } from '@/lib/api'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
+// Nuanu Logo using the provided image asset
+const NuanuLogo = () => (
+    <img
+        src="/img/NuanuLogo.png"
+        alt="nuanu"
+        style={{ width: '94px', height: '17px', aspectRatio: '94/17', opacity: 0.97 }}
+    />
+)
+
 export default function LoginPage() {
     const [settings, setSettings] = useState<PageSettings | null>(null)
     const [activeAds, setActiveAds] = useState<ScheduledAd[]>([])
     const [currentAdIndex, setCurrentAdIndex] = useState(0)
     const [loading, setLoading] = useState(true)
     const [connecting, setConnecting] = useState(false)
+    const [agreedToTerms, setAgreedToTerms] = useState(false)
 
     useEffect(() => {
         async function fetchData() {
@@ -17,70 +27,40 @@ export default function LoginPage() {
                 const [s, allAds] = await Promise.all([getSettings(), getAds()])
                 setSettings(s)
 
-                console.log('📊 All ads from backend:', allAds)
-
-                // Filter ads that are currently active
                 const now = new Date()
-
-                // Get local date string YYYY-MM-DD
                 const year = now.getFullYear()
                 const month = String(now.getMonth() + 1).padStart(2, '0')
                 const day = String(now.getDate()).padStart(2, '0')
                 const todayStr = `${year}-${month}-${day}`
-
-                // Get local time string HH:mm
                 const hours = String(now.getHours()).padStart(2, '0')
                 const minutes = String(now.getMinutes()).padStart(2, '0')
-                const nowTimeStr = `${hours}:${minutes}` // Format HH:mm
-
-                console.log(`🕒 System Time: ${todayStr} ${nowTimeStr}`)
+                const nowTimeStr = `${hours}:${minutes}`
 
                 const activeToday = allAds.filter(ad => {
-                    // 1. Check Active Status
                     if (!ad.is_active) return false
-
                     try {
-                        // 2. Check Date Range
-                        // Start Date: ALLOW FUTURE ADS (User preference: 'Active' status overrides start date)
-                        /* 
-                        if (ad.start_date) {
-                            const adStartDate = ad.start_date.split('T')[0].trim()
-                            if (todayStr < adStartDate) return false
-                        }
-                        */
-
-                        // End Date: If exists, today must be <= end_date
                         if (ad.end_date) {
                             const adEndDate = ad.end_date.split('T')[0].trim()
                             if (todayStr > adEndDate) return false
                         }
-
-                        // 3. Check Time Range - Fail Open if parsing error
-                        // Start Time
                         if (ad.start_time) {
-                            const adStartTime = ad.start_time.trim().substring(0, 5) // "HH:mm"
+                            const adStartTime = ad.start_time.trim().substring(0, 5)
                             if (adStartTime.match(/^\d{2}:\d{2}$/)) {
                                 if (nowTimeStr < adStartTime) return false
                             }
                         }
-
-                        // End Time
                         if (ad.end_time) {
-                            const adEndTime = ad.end_time.trim().substring(0, 5) // "HH:mm"
+                            const adEndTime = ad.end_time.trim().substring(0, 5)
                             if (adEndTime.match(/^\d{2}:\d{2}$/)) {
                                 if (nowTimeStr > adEndTime) return false
                             }
                         }
                     } catch (e) {
-                        console.warn('Ad filter error (allowing ad):', e)
-                        // If any check fails due to bad data, show the ad anyway
                         return true
                     }
-
                     return true
                 })
 
-                console.log(`✅ Active ads (${activeToday.length}):`, activeToday)
                 setActiveAds(activeToday)
             } catch (err) {
                 console.error('Failed to fetch ads:', err)
@@ -103,26 +83,13 @@ export default function LoginPage() {
 
     if (loading || !settings) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-950">
-                <div className="text-white flex flex-col items-center gap-4">
-                    <div className="w-10 h-10 border-4 border-blue-600 border-t-white rounded-full animate-spin" />
-                    <p className="font-bold tracking-widest text-xs uppercase opacity-50">Loading Portal...</p>
+            <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#F9F6F1' }}>
+                <div className="flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin" />
+                    <p className="text-xs text-gray-400 tracking-widest uppercase">Loading...</p>
                 </div>
             </div>
         )
-    }
-
-    let bgImage = settings.background_image
-    if (bgImage.startsWith('url(')) {
-        bgImage = bgImage.slice(4, -1).replace(/['"]/g, '')
-    }
-
-    const backgroundStyle = {
-        backgroundImage: `url('${bgImage}')`,
-        backgroundColor: settings.background_color,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
     }
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -132,7 +99,6 @@ export default function LoginPage() {
         const formData = new FormData(e.currentTarget)
         const email = formData.get('email') as string
 
-        // Robust Email Validation
         const emailRegex = /^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/i
         if (!emailRegex.test(email)) {
             alert('Please enter a valid email address.')
@@ -140,10 +106,7 @@ export default function LoginPage() {
             return
         }
 
-        // Logic for "Better Logic" - Advanced detection
         const [userPart, domainPart] = email.toLowerCase().split('@')
-
-        // 1. Vowel check (Detect keyboard mash)
         const hasVowel = /[aeiouy]/.test(userPart)
         if (!hasVowel) {
             alert('Please enter a real email address (e.g. yourname@domain.com)')
@@ -151,14 +114,12 @@ export default function LoginPage() {
             return
         }
 
-        // 2. Length check
         if (userPart.length < 3 || domainPart.length < 4) {
             alert('Email is too short. Please enter your full email address.')
             setConnecting(false)
             return
         }
 
-        // 3. Common Junk domains check
         const junkDomains = ['test.com', 'example.com', 'abc.com', 'asd.com']
         if (junkDomains.includes(domainPart)) {
             alert('This email domain is not allowed. Please use a real email.')
@@ -166,209 +127,479 @@ export default function LoginPage() {
             return
         }
 
-        // MikroTik Hotspot Parameters from query string (passed by login.html)
         const params = new URLSearchParams(window.location.search)
         const gatewayIP = params.get('ip') || '192.168.1.1'
         const linkLogin = params.get('link-login-only') || `http://${gatewayIP}/login`
         const hotspotUser = params.get('username') || 'user'
-        const hotspotPass = params.get('password') || 'password' // Typically empty for trial
+        const hotspotPass = params.get('password') || 'password'
         const dstUrl = 'https://www.nuanu.com/'
 
-        // Construct final MikroTik login URL
         const loginUrl = `${linkLogin}?username=${encodeURIComponent(hotspotUser)}&password=${encodeURIComponent(hotspotPass)}&dst=${encodeURIComponent(dstUrl)}`
 
         try {
-            // Tracking to Go backend - NOW WE WAIT FOR IT
             const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
             const resp = await fetch(`${API_URL}/api/settings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, tracking: true })
             })
-
             const result = await resp.json()
             if (!result.success) {
                 alert(result.message || 'Invalid email address. Please try again.')
                 setConnecting(false)
                 return
             }
-
-            // ONLY REDIRECT IF SAVED SUCCESSFULLY
             window.location.href = loginUrl
         } catch (err) {
             console.error('Tracking error:', err)
-            // Fallback: allow anyway if server is down, but we prefer strict
             window.location.href = loginUrl
         }
     }
 
     const currentAd = activeAds[currentAdIndex]
     const hasMultipleAds = activeAds.length > 1
-
     const paramsUrl = typeof window !== 'undefined' ? window.location.search : ''
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4 relative font-sans" style={backgroundStyle}>
-            {/* Dark sophisticated overlay */}
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" />
+        <div
+            className="login-container"
+            style={{
+                backgroundColor: settings?.background_color || '#1D2B29',
+                backgroundImage: settings?.background_image ? (settings.background_image.startsWith('url') ? settings.background_image : `url(${settings.background_image})`) : 'none',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat'
+            }}
+        >
+            <style jsx>{`
+                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+                
+                .login-container {
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-family: 'Inter', sans-serif;
+                    width: 100%;
+                }
 
-            <main className="relative w-full max-w-[480px] bg-white/95 backdrop-blur-xl rounded-[40px] shadow-[0_32px_64px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-700">
+                .login-card {
+                    display: flex;
+                    width: 393px;
+                    height: 852px;
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: -31px;
+                    background: transparent;
+                    position: relative;
+                    overflow: visible;
+                }
 
-                {/* Ads Carousel if active */}
-                {currentAd && (
-                    <div className="relative group overflow-hidden border-b border-gray-100">
-                        {/* Carousel Container */}
-                        <div className="relative h-48 sm:h-56 overflow-hidden bg-gray-900">
-                            {/* Ad Image with fade transition */}
-                            <img
-                                key={currentAdIndex}
-                                src={currentAd.image}
-                                alt={currentAd.title}
-                                className="w-full h-full object-cover transition-opacity duration-700 animate-in fade-in"
+                /* Banner Ads Section */
+                .banner-section {
+                    display: flex;
+                    height: 304px;
+                    padding: 16px 24px 48px 16px;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    flex-shrink: 0;
+                    align-self: stretch;
+                    background-size: cover;
+                    background-position: center;
+                    background-repeat: no-repeat;
+                    position: relative;
+                    z-index: 1;
+                }
+
+                /* Header with Logo and Ads Label */
+                .banner-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    align-self: stretch;
+                    width: 100%;
+                }
+
+                .ads-label {
+                    display: flex;
+                    width: 50px;
+                    height: 23px;
+                    padding: 6px 16px;
+                    justify-content: center;
+                    align-items: center;
+                    gap: 8px;
+                    flex-shrink: 0;
+                    border-radius: 12px;
+                    background: rgba(10, 15, 15, 0.20);
+                    color: rgba(255, 255, 255, 0.9);
+                    font-size: 10px;
+                    font-weight: 600;
+                    letter-spacing: 0.05em;
+                }
+
+                /* Nav Slider */
+                .nav-slider {
+                    display: flex;
+                    padding: 0 2px;
+                    align-items: flex-start;
+                    gap: 4px;
+                    margin-top: auto;
+                }
+
+                .dot {
+                    height: 4px;
+                    border-radius: 2px;
+                    background: rgba(255, 255, 255, 0.4);
+                    transition: all 0.3s ease;
+                    cursor: pointer;
+                    border: none;
+                }
+
+                .dot.active {
+                    background: #ffffff;
+                    width: 20px;
+                }
+
+                .dot:not(.active) {
+                    width: 6px;
+                }
+
+                /* Body Section */
+                .body-section {
+                    display: flex;
+                    width: 393px;
+                    flex: 1;
+                    padding: 32px 24px;
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 20px;
+                    flex-shrink: 0;
+                    border-radius: 24px 24px 0 0;
+                    background: #F9F6F1;
+                    z-index: 2;
+                    margin-top: -31px;
+                    position: relative;
+                }
+
+                .form-container {
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    flex: 1 0 0;
+                    align-self: stretch;
+                }
+
+                .nuanu-logo-body {
+                    width: 94px;
+                    height: 17px;
+                    aspect-ratio: 94/17;
+                    opacity: 0.97;
+                    display: flex;
+                }
+
+                .welcome-text {
+                    margin-top: 12px;
+                    margin-bottom: 2px;
+                }
+
+                .welcome-subtitle {
+                    font-size: 13px;
+                    color: #6B7280;
+                    font-weight: 400;
+                    line-height: 1.4;
+                    margin: 0;
+                }
+
+                .welcome-title {
+                    font-size: 24px;
+                    font-weight: 700;
+                    color: #111111;
+                    line-height: 1.2;
+                    margin: 0;
+                    letter-spacing: -0.5px;
+                }
+
+                /* Form */
+                form {
+                    display: flex;
+                    padding-top: 12px;
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 12px;
+                    align-self: stretch;
+                }
+
+                .form-group {
+                    align-self: stretch;
+                }
+
+                .form-label {
+                    display: block;
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: #374151;
+                    margin-bottom: 4px;
+                }
+
+                .form-input {
+                    width: 100%;
+                    padding: 10px 14px;
+                    border: 1px solid #E5E7EB;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    color: #111;
+                    background: #fff;
+                    outline: none;
+                    transition: border-color 0.2s;
+                }
+
+                .form-input::placeholder {
+                    color: #9CA3AF;
+                }
+
+                .form-input:focus {
+                    border-color: #111111;
+                }
+
+                .checkbox-row {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 10px;
+                }
+
+                .checkbox-input {
+                    width: 20px;
+                    height: 20px;
+                    appearance: none;
+                    background-image: url('/img/Check Box.png');
+                    background-size: cover;
+                    background-position: center;
+                    cursor: pointer;
+                    margin: 0;
+                    flex-shrink: 0;
+                }
+
+                .checkbox-input:checked {
+                    background-color: #111111;
+                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+                    background-size: 70%;
+                    background-repeat: no-repeat;
+                    background-position: center;
+                }
+
+                .checkbox-label {
+                    font-size: 11px;
+                    color: #6B7280;
+                    line-height: 1.5;
+                    cursor: pointer;
+                    padding-top: 2px;
+                }
+
+                /* Connect Button */
+                .connect-btn {
+                    width: 100%;
+                    padding: 14px;
+                    background: #111111;
+                    color: #ffffff;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 15px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                }
+
+                .connect-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+                /* Divider */
+                .divider {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    width: 100%;
+                    margin-top: 12px;
+                }
+
+                .divider-line {
+                    flex: 1;
+                    height: 1px;
+                    background: #E5E7EB;
+                }
+
+                .divider-text {
+                    font-size: 12px;
+                    color: #9CA3AF;
+                }
+
+                /* Social buttons */
+                .social-grid {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 12px;
+                    width: 100%;
+                    margin-top: 12px;
+                    padding-bottom: 20px;
+                }
+
+                .social-btn {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    padding: 10px;
+                    border: 1px solid #E5E7EB;
+                    border-radius: 40px;
+                    background: #fff;
+                    color: #374151;
+                    font-size: 13px;
+                    font-weight: 500;
+                    text-decoration: none;
+                }
+
+                .social-btn img {
+                    width: 18px;
+                    height: 18px;
+                    object-fit: contain;
+                }
+
+                .spinner {
+                    width: 18px;
+                    height: 18px;
+                    border: 2px solid rgba(255,255,255,0.3);
+                    border-top-color: white;
+                    border-radius: 50%;
+                    animation: spin 0.7s linear infinite;
+                }
+
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
+
+            <main className="login-card">
+
+                {/* Banner Section */}
+                <div
+                    className="banner-section"
+                    style={{
+                        backgroundImage: currentAd ? `url(${currentAd.image})` : "url('/img/Banner ads.png')",
+                        backgroundColor: 'lightgray',
+                        cursor: currentAd?.link ? 'pointer' : 'default'
+                    }}
+                    onClick={() => {
+                        if (currentAd?.link) {
+                            window.open(currentAd.link, '_blank')
+                        }
+                    }}
+                >
+                    <div className="banner-header">
+                        <div className="ads-label">Ads</div>
+                    </div>
+
+                    {/* Nav Slider */}
+                    <div className="nav-slider">
+                        {(activeAds.length > 0 ? activeAds : [1]).map((_, i) => (
+                            <button
+                                key={i}
+                                className={`dot${i === currentAdIndex ? ' active' : ''}`}
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    setCurrentAdIndex(i)
+                                }}
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/20 to-transparent" />
+                        ))}
+                    </div>
+                </div>
 
-                            {/* Featured Badge */}
-                            <div className="absolute top-4 left-4">
-                                <span className="px-3 py-1 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">Featured Offer</span>
+                {/* Body Section */}
+                <div className="body-section">
+                    <div className="form-container">
+                        {/* Nuanu Logo */}
+                        <div className="nuanu-logo-body">
+                            <NuanuLogo />
+                        </div>
+
+                        {/* Welcome text */}
+                        <div className="welcome-text">
+                            <p className="welcome-subtitle">Welcome to</p>
+                            <h1 className="welcome-title">Nuanu Free WiFi</h1>
+                        </div>
+
+                        {/* Form */}
+                        <form onSubmit={handleSubmit}>
+                            <div className="form-group">
+                                <label className="form-label" htmlFor="email">Email Address</label>
+                                <input
+                                    id="email"
+                                    type="email"
+                                    name="email"
+                                    placeholder="Enter your email"
+                                    required
+                                    className="form-input"
+                                />
                             </div>
 
-                            {/* Left Arrow - Always visible if multiple ads */}
-                            {hasMultipleAds && (
-                                <button
-                                    onClick={(e) => {
-                                        e.preventDefault()
-                                        setCurrentAdIndex((prev) => (prev - 1 + activeAds.length) % activeAds.length)
-                                    }}
-                                    className="absolute left-3 top-1/2 -translate-y-1/2 z-10 bg-black/30 hover:bg-black/50 text-white backdrop-blur-sm p-2 rounded-full transition-all hover:scale-110 border border-white/20 shadow-lg"
-                                    aria-label="Previous ad"
-                                >
-                                    <ChevronLeft className="w-6 h-6" />
-                                </button>
-                            )}
-
-                            {/* Right Arrow - Always visible if multiple ads */}
-                            {hasMultipleAds && (
-                                <button
-                                    onClick={(e) => {
-                                        e.preventDefault()
-                                        setCurrentAdIndex((prev) => (prev + 1) % activeAds.length)
-                                    }}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 z-10 bg-black/30 hover:bg-black/50 text-white backdrop-blur-sm p-2 rounded-full transition-all hover:scale-110 border border-white/20 shadow-lg"
-                                    aria-label="Next ad"
-                                >
-                                    <ChevronRight className="w-6 h-6" />
-                                </button>
-                            )}
-
-                            {/* Ad Title and Description */}
-                            <div className="absolute bottom-4 left-6 right-6">
-                                <h2 className="text-xl font-black text-white leading-tight mb-1 drop-shadow-sm">{currentAd.title}</h2>
-                                <p className="text-xs text-gray-200 line-clamp-2 drop-shadow-sm font-medium opacity-90 leading-relaxed">{currentAd.description}</p>
+                            <div className="checkbox-row">
+                                <input
+                                    type="checkbox"
+                                    id="terms"
+                                    required
+                                    checked={agreedToTerms}
+                                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                                    className="checkbox-input"
+                                />
+                                <label htmlFor="terms" className="checkbox-label">
+                                    I agree to receive updates and exclusive offers from Nuanu.
+                                </label>
                             </div>
 
-                            {/* Carousel Indicators - Only show if multiple ads */}
-                            {hasMultipleAds && (
-                                <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
-                                    {activeAds.map((_, index) => (
-                                        <button
-                                            key={index}
-                                            onClick={() => setCurrentAdIndex(index)}
-                                            className={`h-2 rounded-full transition-all ${index === currentAdIndex
-                                                ? 'w-6 bg-white'
-                                                : 'w-2 bg-white/50 hover:bg-white/70'
-                                                }`}
-                                            aria-label={`Go to ad ${index + 1}`}
-                                        />
-                                    ))}
+                            <button
+                                type="submit"
+                                disabled={connecting}
+                                className="connect-btn"
+                            >
+                                {connecting ? (
+                                    <>
+                                        <div className="spinner" />
+                                        <span>Connecting...</span>
+                                    </>
+                                ) : (
+                                    'Connect'
+                                )}
+                            </button>
+                        </form>
+
+                        {/* Social Login */}
+                        {(settings.google_login_enabled === 'true' || settings.facebook_login_enabled === 'true') && (
+                            <>
+                                <div className="divider">
+                                    <div className="divider-line" />
+                                    <span className="divider-text">Or connect with</span>
+                                    <div className="divider-line" />
                                 </div>
-                            )}
-                        </div>
+
+                                <div className="social-grid">
+                                    {settings.google_login_enabled === 'true' && (
+                                        <a href={`/auth/google/login${paramsUrl}`} className="social-btn">
+                                            <img src="/img/google 1.png" alt="google" />
+                                            Google
+                                        </a>
+                                    )}
+                                    {settings.facebook_login_enabled === 'true' && (
+                                        <a href={`/auth/facebook/login${paramsUrl}`} className="social-btn">
+                                            <img src="/img/facebook 1.png" alt="facebook" />
+                                            Facebook
+                                        </a>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
-                )}
-
-                {/* Header Context if no Ad */}
-                {!currentAd && (
-                    <div className="h-24 sm:h-28 bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700 flex items-center justify-center p-6 text-center border-b border-white/10 shadow-lg">
-                        <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-2xl">{settings.page_title}</h1>
-                    </div>
-                )}
-
-                {/* Conditional Title if Ad is present */}
-                {currentAd && (
-                    <div className="px-8 pt-8 text-center">
-                        <h1 className="text-2xl font-black text-gray-900 tracking-tight leading-tight">{settings.page_title}</h1>
-                    </div>
-                )}
-
-                {/* Login Form */}
-                <div className="p-8 sm:p-10 space-y-8">
-                    <p className="text-center text-sm font-semibold text-gray-500/80">
-                        Sign in to connect to the network.
-                    </p>
-
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="space-y-2">
-                            <label className="block text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Email Connection</label>
-                            <input
-                                type="email"
-                                name="email"
-                                placeholder="name@example.com"
-                                required
-                                pattern="[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$"
-                                className="w-full px-6 py-4 rounded-2xl border-2 border-gray-100 focus:border-blue-500 focus:ring-0 outline-none transition-all text-gray-900 font-bold placeholder:text-gray-300 bg-gray-50/50"
-                            />
-                        </div>
-
-                        <div className="flex items-start gap-3 p-4 bg-blue-50/50 rounded-2xl border border-blue-100/50 group transition-colors hover:bg-blue-50">
-                            <input type="checkbox" id="terms" required className="mt-0.5 w-5 h-5 rounded-lg border-2 border-blue-200 text-blue-600 focus:ring-offset-0 focus:ring-0 transition-all cursor-pointer" />
-                            <label htmlFor="terms" className="text-[11px] leading-relaxed text-gray-600 font-medium cursor-pointer select-none">
-                                I agree to receive promotional emails, newsletters, and updates from NUANU.
-                            </label>
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={connecting}
-                            className="w-full py-5 px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-base font-black rounded-2xl shadow-[0_12px_24px_-8px_rgba(37,99,235,0.4)] hover:shadow-[0_16px_32px_-8px_rgba(37,99,235,0.5)] hover:-translate-y-0.5 transition-all duration-300 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3"
-                        >
-                            {connecting ? (
-                                <>
-                                    <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                                    <span>Verifying...</span>
-                                </>
-                            ) : (
-                                settings.button_text
-                            )}
-                        </button>
-                    </form>
-
-                    {/* Social Login Section */}
-                    {(settings.google_login_enabled === 'true' || settings.facebook_login_enabled === 'true') && (
-                        <div className="space-y-6 pt-6 border-t border-gray-50">
-                            <div className="relative flex items-center justify-center">
-                                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
-                                <span className="relative bg-white px-4 text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Or connect with</span>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4 uppercase font-black text-[10px] tracking-widest">
-                                {settings.google_login_enabled === 'true' && (
-                                    <a href={`/auth/google/login${paramsUrl}`} className="flex items-center justify-center gap-3 py-4 rounded-2xl border-2 border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all group active:scale-95 shadow-sm">
-                                        <svg className="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
-                                        <span className="text-gray-600">Google</span>
-                                    </a>
-                                )}
-                                {settings.facebook_login_enabled === 'true' && (
-                                    <a href={`/auth/facebook/login${paramsUrl}`} className="flex items-center justify-center gap-3 py-4 rounded-2xl border-2 border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all group active:scale-95 shadow-sm">
-                                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>
-                                        <span className="text-gray-600">Facebook</span>
-                                    </a>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-
                 </div>
             </main>
         </div>

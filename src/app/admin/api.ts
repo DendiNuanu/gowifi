@@ -20,6 +20,7 @@ export interface ScheduledAd {
     title: string
     description: string
     image: string
+    link: string
     start_date: string
     end_date: string
     start_time: string
@@ -27,10 +28,11 @@ export interface ScheduledAd {
     is_active: boolean
 }
 
+
 export async function getSettings(): Promise<PageSettings> {
     try {
         console.log(`📡 Fetching settings from: ${API_URL}/api/settings`)
-        const res = await fetch(`${API_URL}/api/settings`, { 
+        const res = await fetch(`${API_URL}/api/settings`, {
             cache: 'no-store',
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
@@ -81,7 +83,7 @@ export async function uploadFile(file: File, isAd = false) {
 export async function getAds(): Promise<ScheduledAd[]> {
     try {
         console.log(`📡 Fetching ads from: ${API_URL}/api/ads`)
-        const res = await fetch(`${API_URL}/api/ads`, { 
+        const res = await fetch(`${API_URL}/api/ads`, {
             cache: 'no-store',
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }

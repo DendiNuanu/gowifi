@@ -44,6 +44,7 @@ type ScheduledAd struct {
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	Image       string    `json:"image"`
+	Link        string    `json:"link"`
 	StartDate   string    `json:"start_date"`
 	EndDate     string    `json:"end_date"`
 	StartTime   string    `json:"start_time"`
@@ -51,6 +52,7 @@ type ScheduledAd struct {
 	IsActive    bool      `json:"is_active"`
 	CreatedAt   time.Time `json:"created_at"`
 }
+
 
 var db *sql.DB
 
@@ -70,6 +72,7 @@ func initDB() {
 			title TEXT,
 			description TEXT,
 			image TEXT,
+			link TEXT,
 			start_date DATE,
 			end_date DATE,
 			start_time TIME,
@@ -78,12 +81,17 @@ func initDB() {
 			created_at TIMESTAMP DEFAULT NOW()
 		);
 
+
 		CREATE TABLE IF NOT EXISTS collected_emails (
 			id SERIAL PRIMARY KEY,
 			email TEXT UNIQUE NOT NULL,
 			source TEXT, -- 'manual', 'google', 'facebook'
 			created_at TIMESTAMP DEFAULT NOW()
 		);
+
+		-- Migration: Add link column if not exists
+		ALTER TABLE scheduled_ads ADD COLUMN IF NOT EXISTS link TEXT;
+
 	`)
 	if err != nil {
 		log.Println("Database initialization error:", err)
@@ -631,7 +639,7 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 
 func GetAds(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	rows, err := db.Query("SELECT id, title, description, image, start_date, end_date, start_time, end_time, is_active FROM scheduled_ads ORDER BY created_at DESC")
+	rows, err := db.Query("SELECT id, title, description, image, link, start_date, end_date, start_time, end_time, is_active FROM scheduled_ads ORDER BY created_at DESC")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -643,9 +651,16 @@ func GetAds(w http.ResponseWriter, r *http.Request) {
 		var ad ScheduledAd
 		var sd, ed sql.NullString
 		var st, et sql.NullString
-		if err := rows.Scan(&ad.ID, &ad.Title, &ad.Description, &ad.Image, &sd, &ed, &st, &et, &ad.IsActive); err != nil {
+		var lnk sql.NullString
+		if err := rows.Scan(&ad.ID, &ad.Title, &ad.Description, &ad.Image, &lnk, &sd, &ed, &st, &et, &ad.IsActive); err != nil {
+			log.Printf("❌ GetAds: Scan error: %v", err)
 			continue
 		}
+		if lnk.Valid {
+			ad.Link = lnk.String
+		}
+
+
 		if sd.Valid {
 			ad.StartDate = sd.String
 		}
@@ -666,16 +681,22 @@ func GetAds(w http.ResponseWriter, r *http.Request) {
 func CreateAd(w http.ResponseWriter, r *http.Request) {
 	var ad ScheduledAd
 	if err := json.NewDecoder(r.Body).Decode(&ad); err != nil {
+		log.Printf("❌ CreateAd: JSON decode error: %v", r.Body)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	ad.Link = strings.TrimSpace(ad.Link)
+	log.Printf("➕ Creating Ad: %s, Link: %s", ad.Title, ad.Link)
+
+
 	_, err := db.Exec(`
-		INSERT INTO scheduled_ads (title, description, image, start_date, end_date, start_time, end_time, is_active)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, ad.Title, ad.Description, ad.Image,
+		INSERT INTO scheduled_ads (title, description, image, link, start_date, end_date, start_time, end_time, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`, ad.Title, ad.Description, ad.Image, nullIfEmpty(ad.Link),
 		nullIfEmpty(ad.StartDate), nullIfEmpty(ad.EndDate),
 		nullIfEmpty(ad.StartTime), nullIfEmpty(ad.EndTime), true)
+
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -705,15 +726,19 @@ func UpdateAd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("🔄 Updating Ad ID %d: %s (Active: %v)", id, ad.Title, ad.IsActive)
+	ad.Link = strings.TrimSpace(ad.Link)
+	log.Printf("🔄 Updating Ad ID %d: %s (Link: %s, Active: %v)", id, ad.Title, ad.Link, ad.IsActive)
 
 	_, err = db.Exec(`
 		UPDATE scheduled_ads 
-		SET title = $1, description = $2, image = $3, start_date = $4, end_date = $5, start_time = $6, end_time = $7, is_active = $8
-		WHERE id = $9
-	`, ad.Title, ad.Description, ad.Image,
+		SET title = $1, description = $2, image = $3, link = $4, start_date = $5, end_date = $6, start_time = $7, end_time = $8, is_active = $9
+		WHERE id = $10
+	`, ad.Title, ad.Description, ad.Image, nullIfEmpty(ad.Link),
 		nullIfEmpty(ad.StartDate), nullIfEmpty(ad.EndDate),
 		nullIfEmpty(ad.StartTime), nullIfEmpty(ad.EndTime), ad.IsActive, id)
+
+
+
 
 	if err != nil {
 		log.Printf("❌ UpdateAd: Database execution error: %v", err)
@@ -744,15 +769,22 @@ func GetActiveAd(w http.ResponseWriter, r *http.Request) {
 	timeStr := now.Format("15:04:05")
 
 	var ad ScheduledAd
+	var lnk sql.NullString
 	err := db.QueryRow(`
-		SELECT id, title, description, image, end_date, end_time FROM scheduled_ads 
+		SELECT id, title, description, image, link, end_date, end_time FROM scheduled_ads 
 		WHERE is_active = TRUE 
 		AND (start_date IS NULL OR start_date <= $1)
 		AND (end_date IS NULL OR end_date >= $1)
 		AND (start_time IS NULL OR start_time <= $2)
 		AND (end_time IS NULL OR end_time >= $2)
 		ORDER BY created_at DESC LIMIT 1
-	`, dateStr, timeStr).Scan(&ad.ID, &ad.Title, &ad.Description, &ad.Image, &ad.EndDate, &ad.EndTime)
+	`, dateStr, timeStr).Scan(&ad.ID, &ad.Title, &ad.Description, &ad.Image, &lnk, &ad.EndDate, &ad.EndTime)
+
+	if lnk.Valid {
+		ad.Link = lnk.String
+	}
+
+
 
 	if err != nil {
 		if err == sql.ErrNoRows {

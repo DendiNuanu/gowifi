@@ -30,6 +30,8 @@ export default function AdminPage() {
     const [adTitle, setAdTitle] = useState('')
     const [adDesc, setAdDesc] = useState('')
     const [adImageUrl, setAdImageUrl] = useState('')
+    const [adLink, setAdLink] = useState('')
+
     const [editingAd, setEditingAd] = useState<ScheduledAd | null>(null)
     const [pendingAd, setPendingAd] = useState<ScheduledAd | null>(null)
     const adFileInputRef = useRef<HTMLInputElement>(null)
@@ -230,12 +232,14 @@ export default function AdminPage() {
             title: formData.get('ad_title') as string,
             description: formData.get('ad_desc') as string,
             image: adImageUrl,
+            link: adLink,
             start_date: startDate,
             end_date: endDate,
             start_time: `${startHour}:${startMin}:00`,
             end_time: `${endHour}:${endMin}:59`,
             is_active: editingAd ? editingAd.is_active : true
         }
+
 
         // Check for duplicate dates
         const duplicates = checkDuplicateDates(startDate, endDate, editingAd?.id)
@@ -247,8 +251,10 @@ export default function AdminPage() {
         }
 
         // No conflict, safe to save directly
+        console.log('📡 Submitting Ad Data:', adData)
         await saveAdToBackend(adData)
     }
+
 
     const saveAdToBackend = async (data: ScheduledAd) => {
         let result
@@ -273,6 +279,8 @@ export default function AdminPage() {
         setAdTitle('')
         setAdDesc('')
         setAdImageUrl('')
+        setAdLink('')
+
         if (adFormRef.current) {
             adFormRef.current.reset()
         }
@@ -283,6 +291,8 @@ export default function AdminPage() {
         setAdTitle(ad.title)
         setAdDesc(ad.description)
         setAdImageUrl(getFullImageUrl(ad.image))
+        setAdLink(ad.link || '')
+
 
         if (adFormRef.current) {
             const form = adFormRef.current
@@ -688,6 +698,11 @@ export default function AdminPage() {
                                         <textarea name="ad_desc" required value={adDesc} onChange={(e) => setAdDesc(e.target.value)} rows={3} className="w-full px-4 py-2.5 border-2 border-amber-100 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 bg-white resize-none text-gray-900 placeholder-gray-400" placeholder="Details about this promotion..."></textarea>
                                     </div>
                                     <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Redirect Link (Optional)</label>
+                                        <input type="url" name="ad_link" value={adLink} onChange={(e) => setAdLink(e.target.value)} className="w-full px-4 py-2.5 border-2 border-amber-100 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 bg-white text-gray-900 placeholder-gray-400" placeholder="https://example.com" />
+                                    </div>
+
+                                    <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-2">Schedule Dates</label>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
@@ -789,7 +804,13 @@ export default function AdminPage() {
                                                     <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full ${ad.is_active ? 'bg-green-500' : 'bg-gray-400'} text-white uppercase shadow-lg`}>
                                                         {ad.is_active ? 'Active' : 'Paused'}
                                                     </span>
+                                                    {ad.link && (
+                                                        <span className="px-2.5 py-1 text-[10px] font-bold bg-blue-500 text-white rounded-full uppercase shadow-lg flex items-center gap-1">
+                                                            Linked
+                                                        </span>
+                                                    )}
                                                 </div>
+
                                                 <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button onClick={() => handleEditAd(ad)} className="p-2 bg-white/90 hover:bg-blue-500 hover:text-white text-gray-600 rounded-lg shadow-lg backdrop-blur-sm transition-all hover:scale-110">
                                                         <Pencil className="w-4 h-4" />
