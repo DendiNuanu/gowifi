@@ -177,28 +177,32 @@ export default function LoginPage() {
                 .login-container {
                     min-height: 100vh;
                     display: flex;
-                    align-items: center;
+                    align-items: flex-start;
                     justify-content: center;
                     font-family: 'Inter', sans-serif;
                     width: 100%;
+                    padding: 40px 16px;
+                    box-sizing: border-box;
                 }
 
                 .login-card {
                     display: flex;
-                    width: 393px;
-                    height: 852px;
+                    width: 100%;
+                    max-width: 430px;
+                    min-height: 700px;
                     flex-direction: column;
                     align-items: flex-start;
-                    gap: -31px;
                     background: transparent;
                     position: relative;
-                    overflow: visible;
+                    overflow: hidden;
+                    border-radius: 24px;
+                    box-shadow: 0 24px 60px rgba(0,0,0,0.35);
                 }
 
                 /* Banner Ads Section */
                 .banner-section {
                     display: flex;
-                    height: 304px;
+                    height: 260px;
                     padding: 16px 24px 48px 16px;
                     flex-direction: column;
                     justify-content: space-between;
@@ -210,6 +214,8 @@ export default function LoginPage() {
                     background-repeat: no-repeat;
                     position: relative;
                     z-index: 1;
+                    width: 100%;
+                    box-sizing: border-box;
                 }
 
                 /* Header with Logo and Ads Label */
@@ -268,9 +274,10 @@ export default function LoginPage() {
                 /* Body Section */
                 .body-section {
                     display: flex;
-                    width: 393px;
+                    width: 100%;
+                    box-sizing: border-box;
                     flex: 1;
-                    padding: 32px 24px;
+                    padding: 32px 24px 40px;
                     flex-direction: column;
                     align-items: flex-start;
                     gap: 20px;
