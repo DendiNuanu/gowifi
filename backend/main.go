@@ -139,10 +139,21 @@ func main() {
 		log.Println("⚠️ Database initialization skipped (no connection)")
 	}
 
-	log.Println("--- NUANU BACKEND STARTING (v2.8 ULTRA HARDENED) ---")
+	log.Println("--- NUANU BACKEND STARTING (v3.1 AUTH INTERCEPTOR) ---")
 
 	// Router
 	r := mux.NewRouter()
+	r.StrictSlash(true)
+
+	// Auth Routes - v3.0 EXPLICIT REGISTRATION (most reliable)
+	log.Println("🔌 Registering explicit Auth routes...")
+	r.HandleFunc("/auth/google/login", GoogleLogin).Methods("GET")
+	r.HandleFunc("/auth/google/callback", GoogleCallback).Methods("GET")
+	r.HandleFunc("/auth/facebook/login", FacebookLogin).Methods("GET")
+	r.HandleFunc("/auth/facebook/callback", FacebookCallback).Methods("GET")
+	// Fallback catch-all for any other /auth paths
+	r.PathPrefix("/auth").HandlerFunc(AuthRouter)
+	log.Println("✅ Auth routes registered.")
 
 	// API Routes...
 	r.HandleFunc("/api/settings", GetSettings).Methods("GET")
@@ -160,15 +171,11 @@ func main() {
 
 	r.HandleFunc("/health", HealthCheck).Methods("GET")
 
-	// Auth Routes - v2.4 GUARANTEE ENTRY POINT
-	log.Println("🔌 Registering Auth Catch-All ENTRY POINT...")
-	r.PathPrefix("/auth").HandlerFunc(AuthRouter)
-	log.Println("✅ Auth Catch-All registered.")
-
 	// Fallback for debugging (Enhanced for v2.8)
 	r.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("❌ 404 NOT FOUND: [%s] %s (FULL URL: %s)", r.Method, r.URL.Path, r.URL.String())
-		http.Error(w, "404 page not found - NUANU BACKEND v2.8", http.StatusNotFound)
+		log.Printf("❌ 404 NOT FOUND: [%s] %s (FULL URL: %s) (RemoteAddr: %s)", r.Method, r.URL.Path, r.URL.String(), r.RemoteAddr)
+		msg := fmt.Sprintf("404 page not found: [%s] - NUANU BACKEND v3.1", r.URL.Path)
+		http.Error(w, msg, http.StatusNotFound)
 	})
 
 	// Static files
@@ -182,9 +189,16 @@ func main() {
 	log.Printf("📂 Serving static files from: %s", imgDir)
 	r.PathPrefix("/img/").Handler(http.StripPrefix("/img/", http.FileServer(http.Dir(imgDir))))
 
-	// CORS: Enhanced stability
+	// CORS: Enhanced stability — includes production domain
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"},
+		AllowedOrigins:   []string{
+			"http://localhost:3000",
+			"http://localhost:3001",
+			"http://127.0.0.1:3000",
+			"http://127.0.0.1:3001",
+			"https://gowifi.nuanu.io",
+			"http://gowifi.nuanu.io",
+		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Content-Length", "Accept-Encoding", "Authorization", "X-CSRF-Token"},
 		AllowCredentials: true,
@@ -193,51 +207,104 @@ func main() {
 
 	handler := c.Handler(r)
 	handler = LoggerMiddleware(handler)
+	handler = AuthInterceptor(handler) // v3.1: Outermost handler, bypasses gorilla/mux entirely
 
 	log.Println("🚀 Go Backend starting on 0.0.0.0:8080")
 	log.Fatal(http.ListenAndServe("0.0.0.0:8080", handler))
 }
 
-// AuthRouter v2.8 - Final manual routing guarantee
-func AuthRouter(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	log.Printf("🛂 AuthRouter ENTRY: [%s] %s (FULL: %s)", r.Method, path, r.URL.String())
+// AuthInterceptor v3.1 - NUCLEAR FIX: Bypasses gorilla/mux, CORS, and all middleware for auth routes
+func AuthInterceptor(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Normalize path: lowercase and strip trailing slash
+		path := strings.ToLower(strings.TrimRight(r.URL.Path, "/"))
 
-	if strings.Contains(path, "google/login") {
+		// Debug Log: Show exactly what path is being evaluated
+		if strings.Contains(path, "auth") {
+			log.Printf("🔍 AuthInterceptor checking path: [%s] (Raw: %s)", path, r.URL.Path)
+		}
+
+		if strings.HasSuffix(path, "/auth/google/login") {
+			log.Printf("⚡ INTERCEPTED GoogleLogin [%s]", r.Method)
+			GoogleLogin(w, r)
+			return
+		}
+		if strings.HasSuffix(path, "/auth/google/callback") {
+			log.Printf("⚡ INTERCEPTED GoogleCallback [%s]", r.Method)
+			GoogleCallback(w, r)
+			return
+		}
+		if strings.HasSuffix(path, "/auth/facebook/login") {
+			log.Printf("⚡ INTERCEPTED FacebookLogin [%s]", r.Method)
+			FacebookLogin(w, r)
+			return
+		}
+		if strings.HasSuffix(path, "/auth/facebook/callback") {
+			log.Printf("⚡ INTERCEPTED FacebookCallback [%s]", r.Method)
+			FacebookCallback(w, r)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// AuthRouter - Fallback catch-all for unknown /auth paths
+func AuthRouter(w http.ResponseWriter, r *http.Request) {
+	path := strings.ToLower(strings.TrimRight(r.URL.Path, "/"))
+	log.Printf("🛂 AuthRouter FALLBACK: [%s] path=%s", r.Method, path)
+
+	switch {
+	case strings.HasSuffix(path, "/auth/google/login"):
+		log.Println("✅ Fallback routing to GoogleLogin")
 		GoogleLogin(w, r)
-	} else if strings.Contains(path, "google/callback") {
+	case strings.HasSuffix(path, "/auth/google/callback"):
+		log.Println("✅ Fallback routing to GoogleCallback")
 		GoogleCallback(w, r)
-	} else if strings.Contains(path, "facebook/login") {
+	case strings.HasSuffix(path, "/auth/facebook/login"):
+		log.Println("✅ Fallback routing to FacebookLogin")
 		FacebookLogin(w, r)
-	} else if strings.Contains(path, "facebook/callback") {
+	case strings.HasSuffix(path, "/auth/facebook/callback"):
+		log.Println("✅ Fallback routing to FacebookCallback")
 		FacebookCallback(w, r)
-	} else {
-		log.Printf("❓ Unknown auth path: %s", path)
-		http.Error(w, "404 Auth Route Not Found - NUANU v2.8", http.StatusNotFound)
+	default:
+		log.Printf("❓ Unknown auth path: [%s] - returning 404", path)
+		msg := fmt.Sprintf("404 Auth Route Not Found: [%s] - NUANU v3.1", path)
+		http.Error(w, msg, http.StatusNotFound)
 	}
 }
 
 
 func GoogleLogin(w http.ResponseWriter, r *http.Request) {
-	log.Printf("🚀 MEGA LOG: GoogleLogin triggered! Path: %s", r.URL.Path)
+	log.Printf("🚀 GoogleLogin triggered! Path: %s, Query: %s", r.URL.Path, r.URL.RawQuery)
 	settings := getSettingsFromDB()
-	if settings.GoogleLoginEnabled != "true" || settings.GoogleClientID == "" {
-		http.Error(w, "Google login is disabled or misconfigured", http.StatusForbidden)
+	if settings.GoogleLoginEnabled != "true" {
+		log.Println("❌ Google login is DISABLED in settings")
+		http.Error(w, "Google login is disabled", http.StatusForbidden)
+		return
+	}
+	if settings.GoogleClientID == "" {
+		log.Println("❌ Google Client ID is empty")
+		http.Error(w, "Google login is misconfigured (no client ID)", http.StatusForbidden)
 		return
 	}
 
 	state := r.URL.RawQuery // Pass MikroTik params in state
-	// SUPER FIX: Hardcode the production domain to avoid proxy issues with r.Host
 	const prodDomain = "gowifi.nuanu.io"
 	redirectURI := fmt.Sprintf("https://%s/auth/google/callback", prodDomain)
-	
-	authURL := fmt.Sprintf("https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=email profile&state=%s",
-		settings.GoogleClientID,
-		url.QueryEscape(redirectURI),
-		url.QueryEscape(state),
-	)
 
-	log.Printf("🔗 Constructing Google Auth URL for redirect_uri: %s", redirectURI)
+	// Build OAuth URL using url.Values for proper encoding
+	params := url.Values{}
+	params.Set("client_id", settings.GoogleClientID)
+	params.Set("redirect_uri", redirectURI)
+	params.Set("response_type", "code")
+	params.Set("scope", "email profile")
+	params.Set("state", state)
+	params.Set("access_type", "online")
+	params.Set("prompt", "select_account")
+	authURL := "https://accounts.google.com/o/oauth2/v2/auth?" + params.Encode()
+
+	log.Printf("🔗 Google redirectURI: %s | state: %s", redirectURI, state)
 	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 }
 
@@ -296,54 +363,41 @@ func GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		log.Printf("⚠️ Rejected invalid Google email: %s", userInfo.Email)
 	}
 
-	// Logic to authorize in MikroTik
-	params, _ := url.ParseQuery(state)
-	gatewayIP := params.Get("ip")
-	if gatewayIP == "" {
-		gatewayIP = "192.168.1.1"
-	}
-	linkLogin := params.Get("link-login-only")
-	if linkLogin == "" {
-		linkLogin = fmt.Sprintf("http://%s/login", gatewayIP)
-	}
-	dst := params.Get("link-orig")
-	if dst == "" {
-		dst = "https://www.nuanu.com/"
-	}
-
-	// Redirect to MikroTik login
-	loginURL := fmt.Sprintf("%s?username=%s&password=%s&dst=%s",
-		linkLogin,
-		url.QueryEscape(userInfo.Email),
-		"password",
-		url.QueryEscape(dst),
-	)
-
-	http.Redirect(w, r, loginURL, http.StatusTemporaryRedirect)
+	AuthorizeMikroTik(w, r, userInfo.Email, state)
 }
 
 func FacebookLogin(w http.ResponseWriter, r *http.Request) {
+	log.Printf("🚀 FacebookLogin triggered! Path: %s, Query: %s", r.URL.Path, r.URL.RawQuery)
 	settings := getSettingsFromDB()
-	if settings.FacebookLoginEnabled != "true" || settings.FacebookAppID == "" {
-		http.Error(w, "Facebook login is disabled or misconfigured", http.StatusForbidden)
+	if settings.FacebookLoginEnabled != "true" {
+		log.Println("❌ Facebook login is DISABLED in settings")
+		http.Error(w, "Facebook login is disabled", http.StatusForbidden)
+		return
+	}
+	if settings.FacebookAppID == "" {
+		log.Println("❌ Facebook App ID is empty")
+		http.Error(w, "Facebook login is misconfigured (no app ID)", http.StatusForbidden)
 		return
 	}
 
 	state := r.URL.RawQuery
 	const prodDomain = "gowifi.nuanu.io"
 	redirectURI := fmt.Sprintf("https://%s/auth/facebook/callback", prodDomain)
-	
-	authURL := fmt.Sprintf("https://www.facebook.com/v12.0/dialog/oauth?client_id=%s&redirect_uri=%s&state=%s&scope=email",
-		settings.FacebookAppID,
-		url.QueryEscape(redirectURI),
-		url.QueryEscape(state),
-	)
 
-	log.Printf("🔗 Constructing Facebook Auth URL for redirect_uri: %s", redirectURI)
+	// Build OAuth URL using url.Values for proper encoding
+	fbParams := url.Values{}
+	fbParams.Set("client_id", settings.FacebookAppID)
+	fbParams.Set("redirect_uri", redirectURI)
+	fbParams.Set("state", state)
+	fbParams.Set("scope", "email")
+	authURL := "https://www.facebook.com/v18.0/dialog/oauth?" + fbParams.Encode()
+
+	log.Printf("🔗 Facebook redirectURI: %s | state: %s", redirectURI, state)
 	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 }
 
 func FacebookCallback(w http.ResponseWriter, r *http.Request) {
+	log.Printf("🚀 MEGA LOG: FacebookCallback triggered! Path: %s, Query: %s", r.URL.Path, r.URL.RawQuery)
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
 	settings := getSettingsFromDB()
@@ -356,13 +410,13 @@ func FacebookCallback(w http.ResponseWriter, r *http.Request) {
 	const prodDomain = "gowifi.nuanu.io"
 	redirectURI := fmt.Sprintf("https://%s/auth/facebook/callback", prodDomain)
 
-	// Exchange code for token
-	resp, err := http.Get(fmt.Sprintf("https://graph.facebook.com/v12.0/oauth/access_token?client_id=%s&redirect_uri=%s&client_secret=%s&code=%s",
-		settings.FacebookAppID,
-		url.QueryEscape(redirectURI),
-		settings.FacebookAppSecret,
-		code,
-	))
+	// Exchange code for token (use v18.0 to match login dialog version)
+	tokenParams := url.Values{}
+	tokenParams.Set("client_id", settings.FacebookAppID)
+	tokenParams.Set("redirect_uri", redirectURI)
+	tokenParams.Set("client_secret", settings.FacebookAppSecret)
+	tokenParams.Set("code", code)
+	resp, err := http.Get("https://graph.facebook.com/v18.0/oauth/access_token?" + tokenParams.Encode())
 
 	if err != nil {
 		http.Error(w, "Token exchange failed", http.StatusInternalServerError)
@@ -396,26 +450,49 @@ func FacebookCallback(w http.ResponseWriter, r *http.Request) {
 		log.Printf("⚠️ Rejected invalid Facebook email: %s", userInfo.Email)
 	}
 
-	// Logic to authorize in MikroTik
+	AuthorizeMikroTik(w, r, userInfo.Email, state)
+}
+
+// AuthorizeMikroTik handles the final redirection to MikroTik with correct parameters
+func AuthorizeMikroTik(w http.ResponseWriter, r *http.Request, userEmail string, state string) {
 	params, _ := url.ParseQuery(state)
+	
 	gatewayIP := params.Get("ip")
-	if gatewayIP == "" {
-		gatewayIP = "192.168.1.1"
-	}
 	linkLogin := params.Get("link-login-only")
 	if linkLogin == "" {
+		linkLogin = params.Get("link-login")
+	}
+	if linkLogin == "" && gatewayIP != "" {
 		linkLogin = fmt.Sprintf("http://%s/login", gatewayIP)
 	}
+	if linkLogin == "" {
+		linkLogin = "http://192.168.1.1/login"
+	}
+
 	dst := params.Get("link-orig")
+	if dst == "" {
+		dst = params.Get("dst")
+	}
 	if dst == "" {
 		dst = "https://www.nuanu.com/"
 	}
 
-	// Redirect to MikroTik login
+	// Hotspot credentials from original request (if provided) or default 'user'
+	hotspotUser := params.Get("username")
+	if hotspotUser == "" {
+		hotspotUser = "user"
+	}
+	hotspotPass := params.Get("password")
+	if hotspotPass == "" {
+		hotspotPass = "user" 
+	}
+
+	log.Printf("🎯 Authorizing MikroTik: %s | User: %s | Pass: %s | Dest: %s", linkLogin, hotspotUser, hotspotPass, dst)
+
 	loginURL := fmt.Sprintf("%s?username=%s&password=%s&dst=%s",
 		linkLogin,
-		url.QueryEscape(userInfo.Email),
-		"password",
+		url.QueryEscape(hotspotUser),
+		url.QueryEscape(hotspotPass),
 		url.QueryEscape(dst),
 	)
 

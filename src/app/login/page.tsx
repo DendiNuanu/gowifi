@@ -20,6 +20,20 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(true)
     const [connecting, setConnecting] = useState(false)
     const [agreedToTerms, setAgreedToTerms] = useState(false)
+    const [paramsUrl, setParamsUrl] = useState('')
+    const [mikrotikParams, setMikrotikParams] = useState<Record<string, string>>({})
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            setParamsUrl(window.location.search)
+            const params = new URLSearchParams(window.location.search)
+            const p: Record<string, string> = {}
+            params.forEach((value, key) => {
+                p[key] = value
+            })
+            setMikrotikParams(p)
+        }
+    }, [])
 
     useEffect(() => {
         async function fetchData() {
@@ -127,11 +141,10 @@ export default function LoginPage() {
             return
         }
 
-        const params = new URLSearchParams(window.location.search)
-        const gatewayIP = params.get('ip') || '192.168.1.1'
-        const linkLogin = params.get('link-login-only') || `http://${gatewayIP}/login`
-        const hotspotUser = params.get('username') || 'user'
-        const hotspotPass = params.get('password') || 'password'
+        const gatewayIP = mikrotikParams['ip'] || '192.168.1.1'
+        const linkLogin = mikrotikParams['link-login-only'] || mikrotikParams['link-login'] || `http://${gatewayIP}/login`
+        const hotspotUser = mikrotikParams['username'] || 'user'
+        const hotspotPass = mikrotikParams['password'] || 'user'
         const dstUrl = 'https://www.nuanu.com/'
 
         const loginUrl = `${linkLogin}?username=${encodeURIComponent(hotspotUser)}&password=${encodeURIComponent(hotspotPass)}&dst=${encodeURIComponent(dstUrl)}`
@@ -158,7 +171,6 @@ export default function LoginPage() {
 
     const currentAd = activeAds[currentAdIndex]
     const hasMultipleAds = activeAds.length > 1
-    const paramsUrl = typeof window !== 'undefined' ? window.location.search : ''
 
     return (
         <div
