@@ -283,6 +283,39 @@ export default function LoginPage() {
                     width: 6px;
                 }
 
+                /* Ad Text Overlay */
+                .ad-text-overlay {
+                    position: absolute;
+                    bottom: 31px; /* Match the -31px margin-top of body-section to sit exactly above it */
+                    left: 0;
+                    right: 0;
+                    padding: 40px 24px 12px;
+                    background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 60%, transparent 100%);
+                    color: white;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2px;
+                    pointer-events: none;
+                    z-index: 5;
+                }
+
+                .ad-title {
+                    font-size: 16px;
+                    font-weight: 700;
+                    margin: 0;
+                    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+                    line-height: 1.2;
+                }
+
+                .ad-description {
+                    font-size: 12px;
+                    font-weight: 400;
+                    opacity: 0.95;
+                    margin: 0;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                    line-height: 1.3;
+                }
+
                 /* Body Section */
                 .body-section {
                     display: flex;
@@ -520,19 +553,28 @@ export default function LoginPage() {
                         <div className="ads-label">Ads</div>
                     </div>
 
-                    {/* Nav Slider */}
-                    <div className="nav-slider">
-                        {(activeAds.length > 0 ? activeAds : [1]).map((_, i) => (
-                            <button
-                                key={i}
-                                className={`dot${i === currentAdIndex ? ' active' : ''}`}
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    setCurrentAdIndex(i)
-                                }}
-                            />
-                        ))}
-                    </div>
+                    {/* Nav Slider - only show if multiple ads */}
+                    {activeAds.length > 1 && (
+                        <div className="nav-slider" style={{ zIndex: 10, marginBottom: '31px' }}>
+                            {activeAds.map((_, i) => (
+                                <button
+                                    key={i}
+                                    className={`dot${i === currentAdIndex ? ' active' : ''}`}
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        setCurrentAdIndex(i)
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Ad Text Content */}
+                    {currentAd && currentAd.description && (
+                        <div className="ad-text-overlay">
+                            <p className="ad-description">{currentAd.description}</p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Body Section */}

@@ -229,7 +229,7 @@ export default function AdminPage() {
         const endMin = (formData.get('end_min') as string) || '59'
 
         const adData: ScheduledAd = {
-            title: formData.get('ad_title') as string,
+            title: formData.get('ad_title') as string || formData.get('ad_desc') as string || 'New Campaign',
             description: formData.get('ad_desc') as string,
             image: adImageUrl,
             link: adLink,
@@ -690,10 +690,6 @@ export default function AdminPage() {
                             <div className="grid md:grid-cols-2 gap-8">
                                 <div className="space-y-5">
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Campaign Title</label>
-                                        <input type="text" name="ad_title" required value={adTitle} onChange={(e) => setAdTitle(e.target.value)} className="w-full px-4 py-2.5 border-2 border-amber-100 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 bg-white text-gray-900 placeholder-gray-400" placeholder="e.g. Free Coffee Morning" />
-                                    </div>
-                                    <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">Description</label>
                                         <textarea name="ad_desc" required value={adDesc} onChange={(e) => setAdDesc(e.target.value)} rows={3} className="w-full px-4 py-2.5 border-2 border-amber-100 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 bg-white resize-none text-gray-900 placeholder-gray-400" placeholder="Details about this promotion..."></textarea>
                                     </div>
@@ -821,7 +817,6 @@ export default function AdminPage() {
                                                 </div>
                                             </div>
                                             <div className="p-5 space-y-3">
-                                                <h4 className="font-bold text-gray-900 leading-tight line-clamp-1">{ad.title}</h4>
                                                 <p className="text-xs text-gray-500 line-clamp-2 font-medium">{ad.description}</p>
                                                 <div className="flex flex-wrap gap-y-2 pt-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 border-t border-gray-50 pt-3">
                                                     <div className="flex items-center gap-1.5 mr-4">
